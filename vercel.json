@@ -5,12 +5,12 @@
     { "src": "static/**", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/", "dest": "/static/index.html" },
-    { "src": "/login", "dest": "/static/login.html" },
-    { "src": "/register", "dest": "/static/register.html" },
-    { "src": "/dashboard", "dest": "/static/dashboard.html" },
-    { "src": "/cashbooks", "dest": "/static/cashbooks.html" },
-    { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/api/(.*)", "dest": "/main.py" }
+    { "src": "/", "dest": "/main.py" },
+    { "src": "/login", "dest": "/main.py" },
+    { "src": "/register", "dest": "/main.py" },
+    { "src": "/dashboard", "dest": "/main.py" },
+    { "src": "/cashbooks", "dest": "/main.py" },
+    { "src": "/api/(.*)", "dest": "/main.py" },
+    { "src": "/static/(.*)", "dest": "/static/$1" }
   ]
 }

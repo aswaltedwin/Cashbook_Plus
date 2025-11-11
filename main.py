@@ -1,3 +1,5 @@
+
+import os
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -30,8 +32,10 @@ SESSION_COOKIE = "cb_session"
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # ---------------- DATABASE ----------------
-DATABASE_URL = "sqlite:///./cashbook.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is missing")
+engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -66,7 +70,7 @@ class Entry(Base):
 class SessionToken(Base):
     __tablename__ = "sessions"
     token = Column(String, primary_key=True, index=True)
-    username = Column(String)
+    username = Column(String, ForeignKey("users.username"))
 
 Base.metadata.create_all(bind=engine)
 
@@ -101,7 +105,7 @@ def sanitize_cashbook_name(name: str) -> str:
 def summarize(entries: List[Entry]) -> Dict[str, Any]:
     total_in = sum(e.amount for e in entries if e.type == "cash_in")
     total_out = sum(e.amount for e in entries if e.type == "cash_out")
-    return {"total_in": round(total_in,2), "total_out": round(total_out,2), "balance": round(total_in-total_out,2)}
+    return {"total_in": round(total_in, 2), "total_out": round(total_out, 2), "balance": round(total_in - total_out, 2)}
 
 # ------------------- PAGES --------------------
 @app.get("/", include_in_schema=False)
@@ -199,12 +203,12 @@ def add_entry(payload: Dict[str, Any], user: User = Depends(require_user), db: S
     if not cashbook:
         raise HTTPException(status_code=404, detail="Cashbook not found")
     entry_type = payload.get("type")
-    if entry_type not in ("cash_in","cash_out"):
+    if entry_type not in ("cash_in", "cash_out"):
         raise HTTPException(status_code=400, detail="Invalid type")
     try:
         date_str = payload.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
         datetime.strptime(date_str, "%Y-%m-%d")
-        amount = float(payload.get("amount"))
+        amount = float(payload.get("amount") or 0)
         if amount <= 0:
             raise ValueError()
     except:
@@ -223,7 +227,7 @@ def get_entries(cashbook: str, user: User = Depends(require_user), db: Session =
     if not cb:
         raise HTTPException(status_code=404, detail="Cashbook not found")
     entries = cb.entries
-    return {"entries":[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in entries]}
+    return {"entries": [{"id": e.id, "date": e.date, "type": e.type, "amount": e.amount, "note": e.note} for e in entries]}
 
 @app.delete("/api/delete_entry/{entry_id}")
 def delete_entry(entry_id: str, cashbook: str, user: User = Depends(require_user), db: Session = Depends(get_db)):
@@ -236,7 +240,7 @@ def delete_entry(entry_id: str, cashbook: str, user: User = Depends(require_user
         raise HTTPException(status_code=404, detail="Entry not found")
     db.delete(entry)
     db.commit()
-    return {"message":"Entry deleted"}
+    return {"message": "Entry deleted"}
 
 @app.get("/api/summary/{cashbook}")
 def summary_api(cashbook: str, user: User = Depends(require_user), db: Session = Depends(get_db)):
@@ -253,11 +257,21 @@ def export(cashbook: Optional[str] = None, user: User = Depends(require_user), d
         cb = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
         if not cb:
             raise HTTPException(status_code=404, detail="Cashbook not found")
-        payload = {"username": user.username, "cashbooks": {name:[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in cb.entries]}}
+        payload = {
+            "username": user.username,
+            "cashbooks": {
+                name: [{"id": e.id, "date": e.date, "type": e.type, "amount": e.amount, "note": e.note} for e in cb.entries]
+            }
+        }
     else:
-        payload = {"username": user.username, "cashbooks": {c.name:[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in c.entries] for c in user.cashbooks}}
+        payload = {
+            "username": user.username,
+            "cashbooks": {
+                c.name: [{"id": e.id, "date": e.date, "type": e.type, "amount": e.amount, "note": e.note} for e in c.entries] for c in user.cashbooks
+            }
+        }
     return JSONResponse(payload)
 
 @app.get("/api/health", include_in_schema=False)
 def health():
-    return {"status":"ok"}
+    return {"status": "ok"}
