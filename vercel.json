@@ -5,17 +5,12 @@
       { "src": "static/**", "use": "@vercel/static" }
     ],
     "routes": [
-      
       { "src": "/", "dest": "/static/index.html" },
-      { "src": "/dashboard", "dest": "/static/dashboard.html" },
-      { "src": "/cashbooks", "dest": "/static/cashbooks.html" },
       { "src": "/login", "dest": "/static/login.html" },
       { "src": "/register", "dest": "/static/register.html" },
-  
-
+      { "src": "/dashboard", "dest": "/static/dashboard.html" },
+      { "src": "/cashbooks", "dest": "/static/cashbooks.html" },
       { "src": "/static/(.*)", "dest": "/static/$1" },
-  
-      
       { "src": "/api/(.*)", "dest": "/main.py" }
     ]
   }
