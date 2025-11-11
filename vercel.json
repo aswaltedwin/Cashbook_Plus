@@ -1,16 +1,16 @@
 {
-  "version": 2,
+  "version": 3,
+  "name": "cashbook-plus",
   "builds": [
-    { "src": "main.py", "use": "@vercel/python" },
-    { "src": "static/**", "use": "@vercel/static" }
+    {
+      "src": "api/main.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "50mb" }
+    }
   ],
   "routes": [
     { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/api/(.*)", "dest": "/main.py" },
-    { "src": "/", "dest": "/static/index.html" },
-    { "src": "/login", "dest": "/static/login.html" },
-    { "src": "/register", "dest": "/static/register.html" },
-    { "src": "/dashboard", "dest": "/static/dashboard.html" },
-    { "src": "/cashbooks", "dest": "/static/cashbooks.html" }
+    { "src": "/api/(.*)", "dest": "/api/main.py" },
+    { "src": "/(.*)", "dest": "/api/main.py" }
   ]
 }

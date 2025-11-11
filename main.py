@@ -1,5 +1,4 @@
 import json
-import os
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -14,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 APP_TITLE = "CashBook+"
 app = FastAPI(title=APP_TITLE)
 
-# CORS middleware (must come after app is created)
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # allow all origins (for development)
@@ -25,41 +24,28 @@ app.add_middleware(
 # Static files (frontend)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-DATA_DIR = os.path.join(os.getcwd(), "data")
-BACKUP_DIR = os.path.join(DATA_DIR, "backups")
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
-SESSIONS_FILE = os.path.join(DATA_DIR, "sessions.json")
 SESSION_COOKIE = "cb_session"
-
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# ---------------- HELPERS ----------------
-def ensure_dirs() -> None:
-    """Ensure data directories and files exist."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
-    if not os.path.exists(SESSIONS_FILE):
-        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f)
+# ---------------- IN-MEMORY STORAGE ----------------
+# Vercel serverless functions cannot persist files
+USERS: List[Dict[str, Any]] = []
+SESSIONS: Dict[str, str] = {}
 
+# ---------------- HELPERS ----------------
 def read_users() -> List[Dict[str, Any]]:
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return USERS
 
 def write_users(users: List[Dict[str, Any]]) -> None:
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=2, ensure_ascii=False)
+    global USERS
+    USERS = users
 
 def read_sessions() -> Dict[str, str]:
-    with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return SESSIONS
 
 def write_sessions(sessions: Dict[str, str]) -> None:
-    with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(sessions, f, indent=2, ensure_ascii=False)
+    global SESSIONS
+    SESSIONS = sessions
 
 def find_user(users: List[Dict[str, Any]], username: str) -> Optional[Dict[str, Any]]:
     for user in users:
@@ -90,15 +76,6 @@ def sanitize_cashbook_name(name: str) -> str:
         raise HTTPException(status_code=400, detail="Cashbook name too long")
     return name
 
-def backup_if_needed(username: str, cashbook: str, entries: List[Dict[str, Any]]) -> None:
-    """Create an automatic backup after every 10 transactions."""
-    count = len(entries)
-    if count > 0 and count % 10 == 0:
-        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-        path = os.path.join(BACKUP_DIR, f"{username}_{cashbook}_{timestamp}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2, ensure_ascii=False)
-
 def summarize(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
     total_in = 0.0
     total_out = 0.0
@@ -113,9 +90,6 @@ def summarize(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
         "total_out": round(total_out, 2),
         "balance": round(total_in - total_out, 2),
     }
-
-# Ensure directories exist
-ensure_dirs()
 
 # ------------------- PAGES --------------------
 @app.get("/", include_in_schema=False)
@@ -259,7 +233,6 @@ async def add_entry(payload: Dict[str, Any], user: Dict[str, Any] = Depends(requ
         "note": note,
     }
     cashbooks[cashbook].append(entry)
-    backup_if_needed(user["username"], cashbook, cashbooks[cashbook])
     users = read_users()
     for u in users:
         if u["username"] == user["username"]:
