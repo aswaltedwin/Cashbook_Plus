@@ -72,7 +72,7 @@ class SessionToken(Base):
     token = Column(String, primary_key=True, index=True)
     username = Column(String, ForeignKey("users.username"))
 
-Base.metadata.create_all(bind=engine)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # ---------------- HELPERS ----------------
 def get_db():
