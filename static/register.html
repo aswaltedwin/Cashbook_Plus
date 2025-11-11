@@ -42,7 +42,7 @@
 				setTimeout(() => toast.remove(), 300);
 			}, 3200);
 		}
-
+	
 		document.getElementById("register-form").addEventListener("submit", async (event) => {
 			event.preventDefault();
 			const form = event.currentTarget;
@@ -66,14 +66,8 @@
 				showToast("Network error. Please try again.", "error");
 			}
 		});
-
-		// instead of fetch("/api/login", ...)
-		fetch("/login", {   // or full path if needed
-			method: "POST",
-			body: JSON.stringify(payload),
-			headers: { "Content-Type": "application/json" }
-		});
-
+	
+		
 	</script>
 </body>
 </html>
