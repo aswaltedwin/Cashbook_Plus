@@ -66,6 +66,14 @@
 				showToast("Network error. Please try again.", "error");
 			}
 		});
+
+		// instead of fetch("/api/login", ...)
+		fetch("/login", {   // or full path if needed
+			method: "POST",
+			body: JSON.stringify(payload),
+			headers: { "Content-Type": "application/json" }
+		});
+
 	</script>
 </body>
 </html>
