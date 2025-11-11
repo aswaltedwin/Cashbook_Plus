@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CashBook+ • Welcome</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="theme-light gradient-background">
+	<div class="landing-container glass-card">
+		<h1>CashBook+</h1>
+		<p class="subtitle">Your modern personal finance companion.</p>
+		<div class="landing-actions">
+			<a class="btn primary" href="/login">Log In</a>
+			<a class="btn secondary" href="/register">Create Account</a>
+		</div>
+	</div>
+	<script>
+		setTimeout(() => {
+			if (!document.cookie.includes("cb_session=")) {
+				return;
+			}
+			window.location.href = "/cashbooks";
+		}, 600);
+	</script>
+</body>
+</html>
+

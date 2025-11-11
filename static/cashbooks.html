@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CashBook+ • Manage Cashbooks</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/static/styles.css">
+	<style>
+		/* --- Circular Trash Button Style --- */
+		.trash-btn {
+			width: 38px;
+			height: 38px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.1rem;
+			background: rgba(239, 68, 68, 0.15);
+			color: #ef4444;
+			border: 1px solid rgba(239, 68, 68, 0.3);
+			cursor: pointer;
+			transition: all 0.25s ease;
+			box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
+		}
+
+		.trash-btn:hover {
+			background: rgba(239, 68, 68, 0.25);
+			transform: translateY(-2px) scale(1.05);
+		}
+
+		body.theme-dark .trash-btn {
+			background: rgba(239, 68, 68, 0.25);
+			border-color: rgba(239, 68, 68, 0.4);
+			color: #fca5a5;
+		}
+
+		body.theme-dark .trash-btn:hover {
+			background: rgba(239, 68, 68, 0.35);
+		}
+
+		.cashbook-actions {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.cashbook-actions .btn.primary {
+			padding: 0.7rem;
+			font-size: 0.9rem;
+			border-radius: 6px;
+			width: auto;
+			justify-content: center;
+		}
+
+	</style>
+</head>
+<body class="theme-light gradient-background dashboard-page">
+	<div class="overlay" id="loading-overlay">
+		<div class="spinner"></div>
+	</div>
+
+	<header class="dashboard-header glass-card">
+		<div class="brand">
+			<span class="logo">💼</span>
+			<h1>CashBook+</h1>
+		</div>
+		<div class="header-actions">
+			<button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
+			<span id="welcome-user" class="welcome">Hey there!</span>
+			<a href="/dashboard" class="btn secondary">Dashboard</a>
+			<button id="logout-btn" class="btn ghost">Log Out</button>
+		</div>
+	</header>
+
+	<main class="dashboard-main">
+		<section class="glass-card cashbooks-section">
+			<header class="section-header">
+				<h2>My Cashbooks</h2>
+				<span id="cashbook-count">0 cashbooks</span>
+			</header>
+			
+			<form id="cashbook-form" class="create-cashbook-form">
+				<input type="text" id="new-cashbook-name" placeholder="Enter cashbook name" maxlength="64" required>
+				<button class="btn primary" type="submit">Create New Cashbook</button>
+			</form>
+
+			<div id="cashbooks-list" class="cashbooks-grid">
+				<!-- Cashbooks will be rendered here -->
+			</div>
+		</section>
+	</main>
+
+	<div id="toast-container"></div>
+
+	<script>
+	const toastContainer = document.getElementById("toast-container");
+	const loadingOverlay = document.getElementById("loading-overlay");
+
+	function showToast(message, type = "info") {
+		if (!toastContainer) return;
+		const toast = document.createElement("div");
+		toast.className = `toast ${type}`;
+		toast.textContent = message;
+		toastContainer.appendChild(toast);
+		requestAnimationFrame(() => toast.classList.add("visible"));
+		setTimeout(() => {
+			toast.classList.remove("visible");
+			setTimeout(() => toast.remove(), 320);
+		}, 3600);
+	}
+
+	function showLoading(active) {
+		if (!loadingOverlay) return;
+		active
+			? loadingOverlay.classList.add("active")
+			: loadingOverlay.classList.remove("active");
+	}
+
+	async function fetchJSON(url, options = {}) {
+		const response = await fetch(url, {
+			headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+			...options,
+		});
+		if (response.status === 401) {
+			window.location.href = "/login";
+			return Promise.reject(new Error("Unauthorized"));
+		}
+		if (!response.ok) {
+			const payload = await response.json().catch(() => ({}));
+			throw new Error(payload.detail || payload.message || "Request failed");
+		}
+		return response.json();
+	}
+
+	async function loadCashbooks() {
+		showLoading(true);
+		try {
+			const data = await fetchJSON("/api/get_cashbooks");
+			if (data.username) {
+				const welcomeEl = document.getElementById("welcome-user");
+				if (welcomeEl) {
+					welcomeEl.textContent = `Hi, ${data.username}!`;
+				}
+			}
+			renderCashbooks(data.cashbooks || []);
+		} catch (error) {
+			showToast(error.message, "error");
+		} finally {
+			showLoading(false);
+		}
+	}
+
+	function renderCashbooks(cashbooks = []) {
+		const list = document.getElementById("cashbooks-list");
+		const countEl = document.getElementById("cashbook-count");
+		if (!list) return;
+
+		list.innerHTML = "";
+		countEl.textContent = `${cashbooks.length} ${cashbooks.length === 1 ? "cashbook" : "cashbooks"}`;
+
+		if (cashbooks.length === 0) {
+			const empty = document.createElement("div");
+			empty.className = "empty-state";
+			empty.style.padding = "3rem";
+			empty.style.textAlign = "center";
+			empty.innerHTML = `
+				<p style="font-size: 1.2rem; color: var(--color-muted); margin-bottom: 1rem;">
+					No cashbooks yet. Create your first one!
+				</p>
+			`;
+			list.appendChild(empty);
+			return;
+		}
+
+		cashbooks.forEach((name) => {
+			const card = document.createElement("div");
+			card.className = "cashbook-card glass-card";
+			card.innerHTML = `
+				<div class="cashbook-card-content">
+					<div class="cashbook-icon">📒</div>
+					<div class="cashbook-info">
+						<h3>${name}</h3>
+						<p>Click to view transactions</p>
+					</div>
+				</div>
+				<div class="cashbook-actions">
+					<a href="/dashboard?cashbook=${encodeURIComponent(name)}" class="btn primary">Open</a>
+					<button class="trash-btn delete-btn" title="Delete Cashbook" data-name="${name}">🗑️</button>
+				</div>
+			`;
+			list.appendChild(card);
+		});
+
+		// attach delete handlers
+		document.querySelectorAll(".delete-btn").forEach((btn) => {
+			btn.addEventListener("click", async (e) => {
+				const name = e.target.getAttribute("data-name");
+				if (!confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) return;
+				try {
+					await fetchJSON(`/api/delete_cashbook`, {
+						method: "DELETE",
+						body: JSON.stringify({ name }),
+					});
+					showToast(`Cashbook "${name}" deleted`, "success");
+					await loadCashbooks();
+				} catch (error) {
+					showToast(error.message, "error");
+				}
+			});
+		});
+	}
+
+	function handleThemeInitialization() {
+		const saved = localStorage.getItem("cb_theme");
+		const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+		const theme = saved || (prefersDark ? "dark" : "light");
+		setTheme(theme);
+		const toggleBtn = document.getElementById("theme-toggle");
+		if (toggleBtn) {
+			toggleBtn.addEventListener("click", () => {
+				const newTheme = document.body.classList.contains("theme-dark") ? "light" : "dark";
+				setTheme(newTheme);
+			});
+		}
+	}
+
+	function setTheme(theme) {
+		document.body.classList.remove("theme-light", "theme-dark");
+		document.body.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
+		const toggleBtn = document.getElementById("theme-toggle");
+		if (toggleBtn) {
+			toggleBtn.textContent = theme === "dark" ? "☀️" : "🌙";
+		}
+		localStorage.setItem("cb_theme", theme);
+	}
+
+	document.addEventListener("DOMContentLoaded", async () => {
+		handleThemeInitialization();
+
+		const cashbookForm = document.getElementById("cashbook-form");
+		if (cashbookForm) {
+			cashbookForm.addEventListener("submit", async (event) => {
+				event.preventDefault();
+				const input = document.getElementById("new-cashbook-name");
+				const name = (input?.value || "").trim();
+				if (!name) {
+					showToast("Please provide a cashbook name", "info");
+					return;
+				}
+				try {
+					await fetchJSON("/api/create_cashbook", {
+						method: "POST",
+						body: JSON.stringify({ name }),
+					});
+					showToast(`Cashbook "${name}" created`, "success");
+					input.value = "";
+					await loadCashbooks();
+				} catch (error) {
+					showToast(error.message, "error");
+				}
+			});
+		}
+
+		const logoutBtn = document.getElementById("logout-btn");
+		if (logoutBtn) {
+			logoutBtn.addEventListener("click", async () => {
+				try {
+					await fetchJSON("/api/logout", { method: "POST" });
+				} finally {
+					window.location.href = "/login";
+				}
+			});
+		}
+
+		await loadCashbooks();
+		showLoading(false);
+	});
+	</script>
+</body>
+</html>

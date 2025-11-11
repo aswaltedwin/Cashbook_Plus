@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CashBook+ • Log In</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="theme-light gradient-background">
+	<div class="auth-wrapper">
+		<div class="auth-card glass-card">
+			<h1>Welcome Back</h1>
+			<p class="subtitle">Log in to access your cashbooks.</p>
+			<form id="login-form" class="stacked-form">
+				<label>
+					<span>Username</span>
+					<input type="text" name="username" placeholder="yourname" required autocomplete="username">
+				</label>
+				<label>
+					<span>Password</span>
+					<input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+				</label>
+				<button class="btn primary" type="submit">Log In</button>
+			</form>
+			<p class="switch-link">No account yet? <a href="/register">Register now</a></p>
+		</div>
+	</div>
+	<div id="toast-container"></div>
+	<script>
+		const toastContainer = document.getElementById("toast-container");
+		function showToast(message, type = "info") {
+			const toast = document.createElement("div");
+			toast.className = `toast ${type}`;
+			toast.textContent = message;
+			toastContainer.appendChild(toast);
+			requestAnimationFrame(() => toast.classList.add("visible"));
+			setTimeout(() => {
+				toast.classList.remove("visible");
+				setTimeout(() => toast.remove(), 300);
+			}, 3200);
+		}
+
+		document.getElementById("login-form").addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const form = event.currentTarget;
+			const data = Object.fromEntries(new FormData(form).entries());
+			try {
+				const response = await fetch("/api/login", {
+					method: "POST",
+					headers: {"Content-Type": "application/json"},
+					body: JSON.stringify(data),
+				});
+				if (!response.ok) {
+					const error = await response.json();
+					showToast(error.detail || "Login failed", "error");
+					return;
+				}
+				showToast("Login successful!", "success");
+				setTimeout(() => {
+					window.location.href = "/cashbooks";
+				}, 500);
+			} catch (err) {
+				showToast("Network error. Please try again.", "error");
+			}
+		});
+	</script>
+</body>
+</html>
+

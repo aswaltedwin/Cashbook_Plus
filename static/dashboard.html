@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CashBook+ • Dashboard</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="theme-light gradient-background dashboard-page">
+	<div class="overlay" id="loading-overlay">
+		<div class="spinner"></div>
+	</div>
+	<header class="dashboard-header glass-card">
+		<div class="brand">
+			<span class="logo">💼</span>
+			<h1>CashBook+</h1>
+		</div>
+		<div class="header-actions">
+			<button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
+			<span id="welcome-user" class="welcome">Hey there!</span>
+			<a href="/cashbooks" class="btn secondary">Cashbooks</a>
+			<button id="logout-btn" class="btn ghost">Log Out</button>
+		</div>
+	</header>
+	<main class="dashboard-main">
+		<div id="cashbook-indicator" class="cashbook-indicator glass-card" style="display: none;">
+			<span>📒 Viewing: <strong id="active-cashbook-name"></strong></span>
+			<a href="/cashbooks" class="btn ghost">Change Cashbook</a>
+		</div>
+		<section class="summary-grid">
+			<div class="summary-card glass-card" data-summary="in">
+				<div class="summary-icon">💰</div>
+				<div class="summary-content">
+					<p>Total Cash In</p>
+					<h2 id="total-in">0</h2>
+				</div>
+			</div>
+			<div class="summary-card glass-card" data-summary="out">
+				<div class="summary-icon">💸</div>
+				<div class="summary-content">
+					<p>Total Cash Out</p>
+					<h2 id="total-out">0</h2>
+				</div>
+			</div>
+			<div class="summary-card glass-card" data-summary="balance">
+				<div class="summary-icon">📊</div>
+				<div class="summary-content">
+					<p>Current Balance</p>
+					<h2 id="balance">0</h2>
+				</div>
+			</div>
+		</section>
+
+		<section class="actions-row glass-card">
+			<form id="entry-form" class="entry-form">
+				<label>
+					<span>Direction</span>
+					<select name="type" required>
+						<option value="cash_in">Cash In</option>
+						<option value="cash_out">Cash Out</option>
+					</select>
+				</label>
+				<label>
+					<span>Date</span>
+					<input type="date" name="date">
+				</label>
+				<label>
+					<span>Amount</span>
+					<input type="number" name="amount" step="0.01" min="0" placeholder="0.00" required>
+				</label>
+				<label class="note-label">
+					<span>Note</span>
+					<input type="text" name="note" placeholder="What is this for?" maxlength="120">
+				</label>
+				<button class="btn primary" type="submit">Add Entry</button>
+			</form>
+		</section>
+
+		<section class="filters-row glass-card">
+			<div class="filter-group">
+				<input type="text" id="search-input" placeholder="Search note or amount">
+				<input type="date" id="date-filter">
+				<button id="clear-filters" class="btn ghost" type="button">Clear</button>
+			</div>
+			<div class="export-group">
+				<button class="btn primary small" id="export-pdf">Export PDF</button>
+				<button class="btn secondary small" id="export-excel">Export Excel</button>
+			</div>
+		</section>
+
+		<section class="glass-card transactions-section">
+			<header class="section-header">
+				<h2>Transactions</h2>
+				<span id="entry-count">0 entries</span>
+			</header>
+			<div class="table-responsive">
+				<table>
+					<thead>
+						<tr>
+							<th>Date</th>
+							<th>Type</th>
+							<th>Amount</th>
+							<th>Note</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody id="transaction-body"></tbody>
+				</table>
+			</div>
+		</section>
+
+		<section class="glass-card insights-section">
+			<header class="section-header">
+				<h2>Insights</h2>
+			</header>
+			<ul id="insights-list" class="insights-list">
+				<li>Keep logging entries to unlock smart insights! 📈</li>
+			</ul>
+		</section>
+	</main>
+
+	<div id="toast-container"></div>
+	<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
+	<script src="/static/app.js" defer></script>
+
+
+</body>
+</html>
+

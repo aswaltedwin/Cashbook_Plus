@@ -1,0 +1,135 @@
+[
+  {
+    "username": "edwin",
+    "password_hash": "$pbkdf2-sha256$29000$xngvZSyF8P4fg9DaG0NoDQ$/gXh89CeX099s4glz7OOVyhGh710O2vYHC8rFqfnUMg",
+    "cashbooks": {
+      "Jul 2025": [
+        {
+          "id": "e61ca8ac-a8f3-4e7c-9e48-4b00c5aa59ee",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": ""
+        },
+        {
+          "id": "412dc994-8172-40b1-8aa4-0818bb92a7fe",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": "pencil"
+        },
+        {
+          "id": "98075554-62c2-4602-840c-8f76749d0c20",
+          "date": "2025-11-11",
+          "type": "cash_out",
+          "amount": 50.0,
+          "note": "samosa"
+        }
+      ],
+      "School": [
+        {
+          "id": "af9480ad-bf90-4e17-bd31-b17955a861d3",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 10.0,
+          "note": ""
+        },
+        {
+          "id": "0cc5dac0-02d5-4fc0-ae71-68293384bba9",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 20.0,
+          "note": ""
+        },
+        {
+          "id": "58f2eb4f-1ffd-4ac3-8486-e74a9af35be5",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": "200"
+        }
+      ]
+    }
+  },
+  {
+    "username": "gunaseeli",
+    "password_hash": "$pbkdf2-sha256$29000$rTUGYCxl7J2TUmqtVaqVcg$qoUsWv/97gsjDayDa6.TWMlAwWarfNziun1vbzwTUL8",
+    "cashbooks": {
+      "Nov 2025": [
+        {
+          "id": "27cd0f80-5dfd-4228-a3e8-bfa93f101b50",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": ""
+        },
+        {
+          "id": "62825ab4-1534-4c9f-9712-6fbb95639e6d",
+          "date": "2025-11-11",
+          "type": "cash_out",
+          "amount": 400.0,
+          "note": ""
+        },
+        {
+          "id": "a457f5ec-d205-4815-a38f-b67e36be0ce4",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 1000.0,
+          "note": ""
+        },
+        {
+          "id": "ade185d9-08ae-4dab-a2c4-03fd1b322635",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": ""
+        },
+        {
+          "id": "a1b8c62b-0670-443d-8c5f-8d5d11a19e0c",
+          "date": "2025-11-11",
+          "type": "cash_out",
+          "amount": 5000.0,
+          "note": ""
+        }
+      ]
+    }
+  },
+  {
+    "username": "hello",
+    "password_hash": "$pbkdf2-sha256$29000$yhmDkJIyhrA2pjQGgNAaQw$lrrgArYW/6E2uyYjlHJvU0yw/Vz2E9o3MmhSrDBEgBU",
+    "cashbooks": {
+      "Test cashbook": [
+        {
+          "id": "ac81aee3-cd10-4e68-a43f-e760d56799f3",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 50.0,
+          "note": ""
+        },
+        {
+          "id": "befec486-46e7-407a-8dfd-3dc6fe7767d6",
+          "date": "2025-11-11",
+          "type": "cash_out",
+          "amount": 50.0,
+          "note": "Chocolates"
+        }
+      ]
+    }
+  },
+  {
+    "username": "test",
+    "password_hash": "$pbkdf2-sha256$29000$wbjXOkfIeY9R6j3H2Hvv/Q$V6w580Jps6j71sK4GXmEHqPPCykxuJZAvEaEaSWVAPk",
+    "cashbooks": {
+      "test": [],
+      "test - 1": [
+        {
+          "id": "019d21fb-af69-4676-bc2c-55f05bfbac1a",
+          "date": "2025-11-11",
+          "type": "cash_in",
+          "amount": 200.0,
+          "note": ""
+        }
+      ]
+    }
+  }
+]
