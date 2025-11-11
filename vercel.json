@@ -10,7 +10,6 @@
     { "src": "/register", "dest": "/static/register.html" },
     { "src": "/dashboard", "dest": "/static/dashboard.html" },
     { "src": "/cashbooks", "dest": "/static/cashbooks.html" },
-    
     { "src": "/static/(.*)", "dest": "/static/$1" },
     { "src": "/api/(.*)", "dest": "/main.py" }
   ]

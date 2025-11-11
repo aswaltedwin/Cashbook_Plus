@@ -1,4 +1,3 @@
-import json
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -6,8 +5,11 @@ from typing import Dict, Any, Optional, List
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
+from passlib.context import CryptContext
+
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 
 # ---------------- CONFIG ----------------
 APP_TITLE = "CashBook+"
@@ -16,54 +18,74 @@ app = FastAPI(title=APP_TITLE)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow all origins (for development)
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Static files (frontend)
+# Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SESSION_COOKIE = "cb_session"
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# ---------------- IN-MEMORY STORAGE ----------------
-# Vercel serverless functions cannot persist files
-USERS: List[Dict[str, Any]] = []
-SESSIONS: Dict[str, str] = {}
+# ---------------- DATABASE ----------------
+DATABASE_URL = "sqlite:///./cashbook.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+    cashbooks = relationship("Cashbook", back_populates="owner")
+
+
+class Cashbook(Base):
+    __tablename__ = "cashbooks"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    entries = relationship("Entry", back_populates="cashbook", cascade="all, delete")
+    owner = relationship("User", back_populates="cashbooks")
+
+
+class Entry(Base):
+    __tablename__ = "entries"
+    id = Column(String, primary_key=True, index=True)
+    cashbook_id = Column(Integer, ForeignKey("cashbooks.id"))
+    date = Column(String)
+    type = Column(String)
+    amount = Column(Float)
+    note = Column(String)
+    cashbook = relationship("Cashbook", back_populates="entries")
+
+
+class SessionToken(Base):
+    __tablename__ = "sessions"
+    token = Column(String, primary_key=True, index=True)
+    username = Column(String)
+
+Base.metadata.create_all(bind=engine)
 
 # ---------------- HELPERS ----------------
-def read_users() -> List[Dict[str, Any]]:
-    return USERS
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-def write_users(users: List[Dict[str, Any]]) -> None:
-    global USERS
-    USERS = users
-
-def read_sessions() -> Dict[str, str]:
-    return SESSIONS
-
-def write_sessions(sessions: Dict[str, str]) -> None:
-    global SESSIONS
-    SESSIONS = sessions
-
-def find_user(users: List[Dict[str, Any]], username: str) -> Optional[Dict[str, Any]]:
-    for user in users:
-        if user.get("username") == username:
-            return user
-    return None
-
-def require_user(request: Request) -> Dict[str, Any]:
-    """Dependency to get the current user from session cookie, or raise 401."""
+def require_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    sessions = read_sessions()
-    username = sessions.get(token)
-    if not username:
+    session = db.query(SessionToken).filter(SessionToken.token == token).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
-    users = read_users()
-    user = find_user(users, username)
+    user = db.query(User).filter(User.username == session.username).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
@@ -76,20 +98,10 @@ def sanitize_cashbook_name(name: str) -> str:
         raise HTTPException(status_code=400, detail="Cashbook name too long")
     return name
 
-def summarize(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
-    total_in = 0.0
-    total_out = 0.0
-    for e in entries:
-        amount = float(e.get("amount", 0) or 0)
-        if e.get("type") == "cash_in":
-            total_in += amount
-        else:
-            total_out += amount
-    return {
-        "total_in": round(total_in, 2),
-        "total_out": round(total_out, 2),
-        "balance": round(total_in - total_out, 2),
-    }
+def summarize(entries: List[Entry]) -> Dict[str, Any]:
+    total_in = sum(e.amount for e in entries if e.type == "cash_in")
+    total_out = sum(e.amount for e in entries if e.type == "cash_out")
+    return {"total_in": round(total_in,2), "total_out": round(total_out,2), "balance": round(total_in-total_out,2)}
 
 # ------------------- PAGES --------------------
 @app.get("/", include_in_schema=False)
@@ -114,180 +126,138 @@ async def cashbooks_page() -> FileResponse:
 
 # -------------------- AUTH --------------------
 @app.post("/api/register")
-async def register(payload: Dict[str, Any]) -> Dict[str, Any]:
+def register(payload: Dict[str, Any], db: Session = Depends(get_db)):
     username = (payload.get("username") or "").strip()
     password = payload.get("password") or ""
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required")
     if len(username) < 3 or len(password) < 6:
         raise HTTPException(status_code=400, detail="Username or password too short")
-    users = read_users()
-    if find_user(users, username):
+    if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=409, detail="Username already exists")
-    password_hash = pwd_context.hash(password)
-    users.append({
-        "username": username,
-        "password_hash": password_hash,
-        "cashbooks": {},
-    })
-    write_users(users)
+    user = User(username=username, password_hash=pwd_context.hash(password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return {"message": "Registered successfully"}
 
 @app.post("/api/login")
-async def login(payload: Dict[str, Any], response: Response) -> Dict[str, Any]:
+def login(payload: Dict[str, Any], response: Response, db: Session = Depends(get_db)):
     username = (payload.get("username") or "").strip()
     password = payload.get("password") or ""
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="Username and password required")
-    users = read_users()
-    user = find_user(users, username)
-    if not user or not pwd_context.verify(password, user.get("password_hash", "")):
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not pwd_context.verify(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = str(uuid.uuid4())
-    sessions = read_sessions()
-    sessions[token] = username
-    write_sessions(sessions)
-    response.set_cookie(
-        key=SESSION_COOKIE,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-        max_age=60 * 60 * 24 * 7,
-    )
+    session = SessionToken(token=token, username=username)
+    db.add(session)
+    db.commit()
+    response.set_cookie(key=SESSION_COOKIE, value=token, httponly=True, samesite="lax", secure=False, max_age=60*60*24*7)
     return {"message": "Logged in", "username": username}
 
 @app.post("/api/logout")
-async def logout(request: Request, response: Response) -> Dict[str, Any]:
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     token = request.cookies.get(SESSION_COOKIE)
     if token:
-        sessions = read_sessions()
-        if token in sessions:
-            del sessions[token]
-            write_sessions(sessions)
+        session = db.query(SessionToken).filter(SessionToken.token == token).first()
+        if session:
+            db.delete(session)
+            db.commit()
     response.delete_cookie(SESSION_COOKIE)
     return {"message": "Logged out"}
 
 # ---------------- CASHBOOKS -------------------
 @app.post("/api/create_cashbook")
-async def create_cashbook(payload: Dict[str, Any], user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
+def create_cashbook(payload: Dict[str, Any], user: User = Depends(require_user), db: Session = Depends(get_db)):
     name = sanitize_cashbook_name(payload.get("name", ""))
-    cashbooks = user.setdefault("cashbooks", {})
-    if name in cashbooks:
+    if db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first():
         raise HTTPException(status_code=409, detail="Cashbook already exists")
-    cashbooks[name] = []
-    users = read_users()
-    for u in users:
-        if u["username"] == user["username"]:
-            u["cashbooks"] = cashbooks
-            break
-    write_users(users)
+    cashbook = Cashbook(name=name, owner=user)
+    db.add(cashbook)
+    db.commit()
+    db.refresh(cashbook)
     return {"message": "Cashbook created", "name": name}
 
 @app.get("/api/get_cashbooks")
-async def get_cashbooks(user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
-    return {"username": user.get("username"), "cashbooks": list(user.get("cashbooks", {}).keys())}
+def get_cashbooks(user: User = Depends(require_user)):
+    return {"username": user.username, "cashbooks": [c.name for c in user.cashbooks]}
 
 @app.delete("/api/delete_cashbook")
-async def delete_cashbook(payload: Dict[str, Any], user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
+def delete_cashbook(payload: Dict[str, Any], user: User = Depends(require_user), db: Session = Depends(get_db)):
     name = sanitize_cashbook_name(payload.get("name", ""))
-    cashbooks = user.get("cashbooks", {})
-    if name not in cashbooks:
+    cashbook = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+    if not cashbook:
         raise HTTPException(status_code=404, detail="Cashbook not found")
-    del cashbooks[name]
-    users = read_users()
-    for u in users:
-        if u["username"] == user["username"]:
-            u["cashbooks"] = cashbooks
-            break
-    write_users(users)
+    db.delete(cashbook)
+    db.commit()
     return {"message": f"Cashbook '{name}' deleted successfully"}
 
 @app.post("/api/add_entry")
-async def add_entry(payload: Dict[str, Any], user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
-    cashbook = sanitize_cashbook_name(payload.get("cashbook", ""))
+def add_entry(payload: Dict[str, Any], user: User = Depends(require_user), db: Session = Depends(get_db)):
+    name = sanitize_cashbook_name(payload.get("cashbook", ""))
+    cashbook = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+    if not cashbook:
+        raise HTTPException(status_code=404, detail="Cashbook not found")
     entry_type = payload.get("type")
-    if entry_type not in ("cash_in", "cash_out"):
+    if entry_type not in ("cash_in","cash_out"):
         raise HTTPException(status_code=400, detail="Invalid type")
-    date_str = payload.get("date")
-    amount = payload.get("amount")
-    note = payload.get("note") or ""
     try:
-        if date_str:
-            datetime.strptime(date_str, "%Y-%m-%d")
-        else:
-            date_str = datetime.utcnow().strftime("%Y-%m-%d")
-        amount = float(amount)
+        date_str = payload.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+        datetime.strptime(date_str, "%Y-%m-%d")
+        amount = float(payload.get("amount"))
         if amount <= 0:
             raise ValueError()
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid date or amount")
-    cashbooks = user.get("cashbooks", {})
-    if cashbook not in cashbooks:
-        raise HTTPException(status_code=404, detail="Cashbook not found")
-    entry = {
-        "id": str(uuid.uuid4()),
-        "date": date_str,
-        "type": entry_type,
-        "amount": amount,
-        "note": note,
-    }
-    cashbooks[cashbook].append(entry)
-    users = read_users()
-    for u in users:
-        if u["username"] == user["username"]:
-            u["cashbooks"] = cashbooks
-            break
-    write_users(users)
-    return {"message": "Entry added", "entry": entry}
+    note = payload.get("note") or ""
+    entry = Entry(id=str(uuid.uuid4()), cashbook=cashbook, date=date_str, type=entry_type, amount=amount, note=note)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {"message": "Entry added", "entry": {"id": entry.id, "date": entry.date, "type": entry.type, "amount": entry.amount, "note": entry.note}}
 
 @app.get("/api/get_entries")
-async def get_entries(cashbook: str, user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
-    cashbook = sanitize_cashbook_name(cashbook)
-    cashbooks = user.get("cashbooks", {})
-    if cashbook not in cashbooks:
+def get_entries(cashbook: str, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    name = sanitize_cashbook_name(cashbook)
+    cb = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+    if not cb:
         raise HTTPException(status_code=404, detail="Cashbook not found")
-    return {"entries": cashbooks[cashbook]}
+    entries = cb.entries
+    return {"entries":[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in entries]}
 
 @app.delete("/api/delete_entry/{entry_id}")
-async def delete_entry(entry_id: str, cashbook: str, user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
-    cashbook = sanitize_cashbook_name(cashbook)
-    cashbooks = user.get("cashbooks", {})
-    if cashbook not in cashbooks:
+def delete_entry(entry_id: str, cashbook: str, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    name = sanitize_cashbook_name(cashbook)
+    cb = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+    if not cb:
         raise HTTPException(status_code=404, detail="Cashbook not found")
-    entries = cashbooks[cashbook]
-    new_entries = [e for e in entries if e.get("id") != entry_id]
-    if len(new_entries) == len(entries):
+    entry = db.query(Entry).filter(Entry.cashbook == cb, Entry.id == entry_id).first()
+    if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    cashbooks[cashbook] = new_entries
-    users = read_users()
-    for u in users:
-        if u["username"] == user["username"]:
-            u["cashbooks"] = cashbooks
-            break
-    write_users(users)
-    return {"message": "Entry deleted"}
+    db.delete(entry)
+    db.commit()
+    return {"message":"Entry deleted"}
 
 @app.get("/api/summary/{cashbook}")
-async def summary(cashbook: str, user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
-    cashbook = sanitize_cashbook_name(cashbook)
-    cashbooks = user.get("cashbooks", {})
-    if cashbook not in cashbooks:
+def summary_api(cashbook: str, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    name = sanitize_cashbook_name(cashbook)
+    cb = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+    if not cb:
         raise HTTPException(status_code=404, detail="Cashbook not found")
-    return summarize(cashbooks[cashbook])
+    return summarize(cb.entries)
 
 @app.get("/api/export")
-async def export(cashbook: Optional[str] = None, user: Dict[str, Any] = Depends(require_user)) -> JSONResponse:
+def export(cashbook: Optional[str] = None, user: User = Depends(require_user), db: Session = Depends(get_db)):
     if cashbook:
         name = sanitize_cashbook_name(cashbook)
-        entries = user.get("cashbooks", {}).get(name)
-        if entries is None:
+        cb = db.query(Cashbook).filter(Cashbook.owner == user, Cashbook.name == name).first()
+        if not cb:
             raise HTTPException(status_code=404, detail="Cashbook not found")
-        payload = {"username": user["username"], "cashbooks": {name: entries}}
+        payload = {"username": user.username, "cashbooks": {name:[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in cb.entries]}}
     else:
-        payload = {"username": user["username"], "cashbooks": user.get("cashbooks", {})}
+        payload = {"username": user.username, "cashbooks": {c.name:[{"id":e.id,"date":e.date,"type":e.type,"amount":e.amount,"note":e.note} for e in c.entries] for c in user.cashbooks}}
     return JSONResponse(payload)
 
 @app.get("/api/health", include_in_schema=False)
-def health() -> Dict[str, Any]:
-    return {"status": "ok"}
+def health():
+    return {"status":"ok"}
