@@ -72,8 +72,6 @@ class SessionToken(Base):
     token = Column(String, primary_key=True, index=True)
     username = Column(String, ForeignKey("users.username"))
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
 # ---------------- HELPERS ----------------
 def get_db():
     db = SessionLocal()
@@ -156,7 +154,7 @@ def login(payload: Dict[str, Any], response: Response, db: Session = Depends(get
     session = SessionToken(token=token, username=username)
     db.add(session)
     db.commit()
-    response.set_cookie(key=SESSION_COOKIE, value=token, httponly=True, samesite="lax", secure=False, max_age=60*60*24*7)
+    response.set_cookie(key=SESSION_COOKIE, value=token, httponly=True, samesite="lax", secure=True, max_age=60*60*24*7)
     return {"message": "Logged in", "username": username}
 
 @app.post("/api/logout")
@@ -196,6 +194,9 @@ def delete_cashbook(payload: Dict[str, Any], user: User = Depends(require_user),
     db.commit()
     return {"message": f"Cashbook '{name}' deleted successfully"}
 
+if __name__ == "__main__":
+    Base.metadata.create_all(engine)
+ 
 @app.post("/api/add_entry")
 def add_entry(payload: Dict[str, Any], user: User = Depends(require_user), db: Session = Depends(get_db)):
     name = sanitize_cashbook_name(payload.get("cashbook", ""))
