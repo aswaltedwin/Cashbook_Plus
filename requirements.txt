@@ -1,7 +1,7 @@
 fastapi==0.115.4
-uvicorn==0.32.0
+uvicorn[standard]==0.24.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.12
 itsdangerous==2.2.0
 sqlalchemy==2.0.24
-psycopg2-binary
+psycopg2-binary==2.9.9
